@@ -184,12 +184,16 @@ class LimeImageExplainer(object):
         segments = segmentation_fn(image)
 
         fudged_image = image.copy()
+
         if hide_color is None:
+            hide_color = np.mean
+
+        if callable(hide_color):
             for x in np.unique(segments):
                 fudged_image[segments == x] = (
-                    np.mean(image[segments == x][:, 0]),
-                    np.mean(image[segments == x][:, 1]),
-                    np.mean(image[segments == x][:, 2]))
+                    hide_color(image[segments == x][:, 0]),
+                    hide_color(image[segments == x][:, 1]),
+                    hide_color(image[segments == x][:, 2]))
         else:
             fudged_image[:] = hide_color
 
