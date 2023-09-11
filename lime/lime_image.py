@@ -2,6 +2,7 @@
 Functions for explaining classifiers that use Image data.
 """
 import copy
+import math
 from functools import partial
 
 import numpy as np
@@ -258,14 +259,14 @@ class LimeImageExplainer(object):
         """
         n_features = np.unique(segments).shape[0]
 
-        if do_sampling:
+        if self.do_sampling:
             data = self.random_state.randint(0, 2, num_samples * n_features) \
                 .reshape((num_samples, n_features))
         else:
+            total_posibilities = math.factorial(n_features)
             amount_of_features = min(total_posibilities, num_samples)
 
             data = [[1] * amount_of_features]
-            total_posibilities = factorial(n_features)
 
             for possible in range(amount_of_features):
                 possible = list(bin(possible).replace('0b', ''))
