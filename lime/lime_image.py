@@ -6,10 +6,10 @@ from functools import partial
 
 import numpy as np
 import sklearn
-from sklearn.utils import check_random_state
+import torch
 from skimage.color import gray2rgb
+from sklearn.utils import check_random_state
 from tqdm.auto import tqdm
-
 
 from . import lime_base
 from .wrappers.scikit_image import SegmentationAlgorithm
@@ -96,7 +96,7 @@ class LimeImageExplainer(object):
     explained."""
 
     def __init__(self, kernel_width=.25, kernel=None, verbose=False,
-                 feature_selection='auto', random_state=None):
+                 feature_selection='auto', random_state=None, do_sampling: bool = True):
         """Init function.
 
         Args:
@@ -113,6 +113,7 @@ class LimeImageExplainer(object):
             random_state: an integer or numpy.RandomState that will be used to
                 generate random numbers. If None, the random state will be
                 initialized using the internal numpy seed.
+            do_sampling: if true the original sampling strategy is used.
         """
         kernel_width = float(kernel_width)
 
@@ -125,6 +126,7 @@ class LimeImageExplainer(object):
         self.random_state = check_random_state(random_state)
         self.feature_selection = feature_selection
         self.base = lime_base.LimeBase(kernel_fn, verbose, random_state=self.random_state)
+        self.do_sampling = do_sampling
 
     def explain_instance(self, image, classifier_fn, labels=(1,),
                          hide_color=None,
@@ -172,6 +174,9 @@ class LimeImageExplainer(object):
             An ImageExplanation object (see lime_image.py) with the corresponding
             explanations.
         """
+        if isinstance(image, torch.Tensor):
+            image = image.detach().cpu().numpy()
+
         if len(image.shape) == 2:
             image = gray2rgb(image)
         if random_seed is None:
@@ -252,8 +257,23 @@ class LimeImageExplainer(object):
                 labels: prediction probabilities matrix
         """
         n_features = np.unique(segments).shape[0]
-        data = self.random_state.randint(0, 2, num_samples * n_features)\
-            .reshape((num_samples, n_features))
+
+        if do_sampling:
+            data = self.random_state.randint(0, 2, num_samples * n_features) \
+                .reshape((num_samples, n_features))
+        else:
+            amount_of_features = min(total_posibilities, num_samples)
+
+            data = [[1] * amount_of_features]
+            total_posibilities = factorial(n_features)
+
+            for possible in range(amount_of_features):
+                possible = list(bin(possible).replace('0b', ''))
+                possible = [int(pos) for pos in possible]
+
+                data.append(possible)
+            data = np.array(data)
+
         labels = []
         data[0, :] = 1
         imgs = []
